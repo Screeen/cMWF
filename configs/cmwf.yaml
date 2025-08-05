@@ -1,0 +1,112 @@
+# Configuration file for the cyclic multichannel Wiener filter experiments.
+num_montecarlo_simulations: 1
+seed_is_random: true
+seed_if_not_random: 123
+max_num_varying_parameters: 199
+max_num_variations_per_parameter: 199
+
+metrics:
+  time: [ 'sisdr' ]
+  freq: []
+
+beamforming:
+  methods_dict:
+    mvdr: false
+    cmvdr: false
+    clcmv: false
+    mwf: true
+    cmwf: true
+  variants: ['blind', 'semi-oracle', 'oracle']  # 'blind', 'semi-oracle', 'oracle'
+  loadings:  # these values can make a lot of difference! Change with extreme care.
+    mwf: [ 1.e-9, 1.e-4, nan ]
+
+cyclostationary_target: true
+cyclic:
+  f0_err_percent: 0
+  freq_range_cyclic: [0, 2500]
+  max_relative_dist_from_harmonic: 1.5
+  P_max: 5  # number of frequency shifts for the cyclic beamforming
+  # Good for music. no_change too small for speech (would lead to remodulation of the signals too often)
+  alpha_thresholds:
+    no_change: 0.005  # 0.0075  # up to this value, do not remodulate the signals
+    small_change: 0.2  # up to this value, remodulate the signals but do not discard spectral covariance matrices
+
+M: 2  # number of microphones
+stft:
+    nfft: 512
+    overlap_fraction: 0.75
+    win_name: 'hann'
+
+time:
+  duration_approx_seconds: 1.  # total duration of the signal
+  chunk_len_seconds: 1.
+
+harmonics_est:
+  # options: oracle_all_harmonics, oracle_f0, periodogram_all_harmonics, nls_f0, nls_f0_bayesian
+  # _f0 options: signals are modulated based on multiples of fundamental frequency (alpha_vec_hz). Worse performance.
+  # all_harmonics options: the signals are modulated by the differences among harmonic. Better performance.
+  algo: nls_f0 # choices are oracle_all_harmonics, oracle_f0, periodogram_all_harmonics, nls_f0, nls_f0_bayesian
+
+cov_estimation:
+  cov_est_forgetting_factor: 0.05
+  noise_cov_est_len_seconds: 2
+  recursive_average: true  # if true, use recursive averaging for the covariance matrices
+
+noise:
+  sig_type: white
+  snr_db_self: 30
+  snr_db_dir: -10
+
+rir_len_seconds: 0.6
+rir_specs:  # Hadad dataset
+  dataset_name: hadad  # hadad or handpicked
+  rir_len_seconds: 0.6
+  rt60: "0.610s"  # options: "0.160s", "0.610s", "any"
+  distance: "any"  # options: "1m", "2m", "any"
+  mic_spacing: "8-8-8-8-8-8-8"  # options: "3-3-3-8-3-3-3", "4-4-4-8-4-4-4", "8-8-8-8-8-8-8", "any"
+  noise_angle: '015'  # fixed noise angle is used ONLY if target_angle is varying_parameter
+
+varying_params_values:
+  cyclic|P_max: [ 1, 2, 5, 10, 20]
+  noise|snr_db_dir: [-15, -10, -5, 0, 5]
+  M: [2, 3, 4, 5, 6]  # number of microphones
+  cyclic|f0_err_percent: [0, 0.01, 0.1, 0.5]  # relative error in the fundamental frequency (f0) of the target signal
+
+target:
+  angle: None
+
+#  plot:
+#    forced_ranges:
+#      snrseg_time: [ -1, 20 ]
+
+synthetic:
+  varying_parameters_names: [noise|snr_db_dir, cyclic|P_max, M, cyclic|f0_err_percent]
+  cyclic:
+    freq_range_cyclic: [0, 8000]
+  target:
+    # if f0 fixed to "correct" value (e.g. 100 or 120), results are better! but maybe not very fair?
+    sig_type: sinusoidal
+    f0_hz: [ 60, 250 ]
+    num_harmonics: 1000 # DON'T CHANGE THIS VALUE unless modify "calculate_harmonic_sets"
+  time:
+    duration_approx_seconds: 5.0  # total duration of the signal
+    chunk_len_seconds: 5.0  # chunks of fixed length
+  cov_estimation:
+    recursive_average: false  # if true, use recursive averaging for the covariance matrices
+  harmonics_est:
+    # options: oracle_all_harmonics, oracle_f0, periodogram_all_harmonics, nls_f0, nls_f0_bayesian
+    algo: oracle_f0
+
+instruments:
+  varying_parameters_names: [noise|snr_db_dir]
+  target:
+    sig_type: sample
+    sample_name: iowa_wav_selected
+
+speech:
+  varying_parameters_names: [noise|snr_db_dir]  # cyclic|P_max,
+  varying_params_values:
+    cyclic|P_max: [ 1, 2, 5, 10]
+  target:
+    sig_type: sample
+    sample_name: speech_harvard
