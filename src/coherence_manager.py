@@ -109,44 +109,6 @@ class CoherenceManager:
         return rho
 
     @staticmethod
-    def calculate_harmonic_info_from_coherence(alpha_vec_hz, rho, thr, P_max_cfg, nfft_real) -> 'HarmonicInfo':
-        """ Calculate harmonic information (harmonic bins, modulation sets, harmonic sets) from coherence matrix. """
-
-        harmonic_bins_ = []
-        modulation_sets_ = []
-
-        for kk in range(rho.shape[1]):
-            rho_kk = rho[:, kk]
-            indices_high_corr = np.where(rho_kk > thr)[0]
-            if indices_high_corr.size > 1:
-                values_high_corr = rho_kk[indices_high_corr]  # Select modulations that have higher coherence
-                top_order = np.argsort(values_high_corr)[::-1]  # Sort by coherence
-                final_selected = indices_high_corr[top_order][:P_max_cfg]  # Keep at most P_max_cfg
-                final_selected_by_freq = np.r_[final_selected[0], np.sort(final_selected[1:])]
-
-                harmonic_bins_.append(kk)
-                modulation_sets_.append(alpha_vec_hz[final_selected_by_freq])
-
-                if 0 not in alpha_vec_hz[final_selected]:
-                    warnings.warn("0 should always be selected: non-modulated freq is perfectly coherent.")
-
-        harmonic_bins_ = np.asfortranarray(harmonic_bins_)
-        if harmonic_bins_.size == 0:
-            print("No coherent frequencies found. Return empty HarmonicInfo() object.")
-            return HarmonicInfo()
-
-        harmonic_sets = -1 * np.ones(nfft_real, dtype=int)
-        harmonic_sets[harmonic_bins_] = np.arange(len(harmonic_bins_))
-
-        # Optional (and not thoroughly tested): merge duplicated modulation sets
-        modulation_sets_, harmonic_sets = CoherenceManager.dedupe_modulation(modulation_sets_, harmonic_sets)
-
-        harm_info = HarmonicInfo(harmonic_bins=harmonic_bins_, alpha_mods_sets=modulation_sets_,
-                                 harmonic_sets=harmonic_sets)
-
-        return harm_info
-
-    @staticmethod
     def dedupe_modulation(mod_sets, harm_sets, tol=1e-6):
         """
         Remove duplicate modulation sets and remap harmonic sets accordingly.
@@ -174,88 +136,7 @@ class CoherenceManager:
 
         return mod_sets_unique, harm_sets_unique
 
-    @staticmethod
-    def plot_coherence_matrix(rho_no0, alpha_no0, SFT):
 
-        best_idx = np.unravel_index(np.argmax(rho_no0), rho_no0.shape)
-        filtered_max = f"{rho_no0[best_idx]:.2f}"
-        f = u.plot_matrix(rho_no0, title=filtered_max, log=False, amp_range=(0, 1.),
-                          xy_label=("Index k, DFT bin omega_k", "Index p, cyclic bin alpha_p"),
-                          show_figures=False)
-        ax = f.axes[0]
-        xticks = ax.get_xticks()
-        xticks = xticks[xticks >= 0]  # remove negative ticks if present
-        xticks = xticks[xticks < rho_no0.shape[1]]  # keep only ticks within bounds
-        ax.set_xticks(xticks + 0.5, [f"{x * SFT.delta_f:.0f}" for x in xticks])
-        ax.set_xlabel("Frequency (Hz)")
-
-        yticks = ax.get_yticks()
-        yticks = yticks[yticks >= 0]
-        yticks = yticks[yticks < rho_no0.shape[0]]  # match matrix height
-        yticks_labels = alpha_no0[yticks.astype(int)]
-        ax.set_yticks(yticks + 0.5, [f"{a:.0f}" for a in yticks_labels])
-        ax.set_ylabel("Cyclic frequency (Hz)")
-        f.show()
-
-        ####
-
-        # Plot for single DFT bin
-        import matplotlib.pyplot as plt
-        sel_dft_bin = int(round(320 / SFT.delta_f))
-        sel_dft_bin = 86
-        f2, ax2 = plt.subplots(1, 1)
-        ax2.grid()
-        ax2.plot(alpha_no0, rho_no0[:, sel_dft_bin])
-        ax2.set_title(f"{(15.625 * sel_dft_bin):.0f} Hz")
-        ax.set_xlabel("Frequency (Hz)")
-        f2.show()
-
-        # Plot for single cyclic frequency
-        import matplotlib.pyplot as plt
-        sel_alpha_bin = int(alpha_no0.size // 2)
-        f2, ax2 = plt.subplots(1, 1)
-        ax2.grid()
-        ax2.plot(SFT.f[:rho_no0.shape[1]], rho_no0[sel_alpha_bin, :])
-        ax2.set_title(f"{(alpha_no0[sel_alpha_bin]):.0f} Hz")
-        ax2.set_xlabel("Frequency (Hz)")
-        f2.show()
-
-    # @staticmethod
-    # def filter_close_mods(mods, scores, pct_threshold=0.05):
-    #     """
-    #     mods: 1D np.array of modulation frequencies
-    #     scores: 1D np.array of corresponding rho values
-    #     pct_threshold: float, percentage difference threshold for grouping
-    #
-    #     Returns:
-    #         indices to keep (relative to the input array)
-    #     """
-    #     if mods.size == 0:
-    #         return np.array([], dtype=int)
-    #
-    #     sorted_idx = np.argsort(mods)
-    #     mods_sorted = mods[sorted_idx]
-    #     scores_sorted = scores[sorted_idx]
-    #
-    #     keep_idx = []
-    #     i = 0
-    #     while i < len(mods_sorted):
-    #         curr_mod = mods_sorted[i]
-    #         cluster = [i]
-    #         j = i + 1
-    #         while j < len(mods_sorted):
-    #             if np.abs(mods_sorted[j] - curr_mod) / (1.e-3 + np.abs(curr_mod)) <= pct_threshold:
-    #                 cluster.append(j)
-    #                 j += 1
-    #             else:
-    #                 break
-    #
-    #         # Pick the one with the highest score in the cluster
-    #         best_local = cluster[np.argmax(scores_sorted[cluster])]
-    #         keep_idx.append(sorted_idx[best_local])
-    #         i = j
-    #
-    #     return np.sort(np.array(keep_idx))
 
     @staticmethod
     def apply_local_coherence_masks(masks: np.ndarray, harmonic_info: 'HarmonicInfo', cov_list: list[np.ndarray],

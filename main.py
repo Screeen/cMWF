@@ -89,11 +89,6 @@ if __name__ == '__main__':
 
                 signals_bfd_dict = ExperimentManager.convert_signals_time_domain(bfd_all_chunks_stft, SFT_real)
 
-                if post_filtering:
-                    signals_bfd_dict_backup = dcopy(signals_bfd_dict)
-                    ExperimentManager.apply_post_filtering(signals, signals_bfd_dict, dft_props, f0man, f0_over_time,
-                                                           harmonic_freqs_est, do_plots, SFT, SFT_real)
-
                 signals_dict = {**signals, **signals_bfd_dict_backup, **signals_bfd_dict}
                 signals_dict = evaluator.bake_dict_for_evaluation(signals_dict,
                                                                   needs_masked_stft=cfg['use_masked_stft_for_evaluation'])
@@ -137,7 +132,7 @@ if __name__ == '__main__':
     elapsed_time = time.time() - start_time
     print(f"Elapsed time: {elapsed_time:.2f}s")
 
-    target_path_figs = Path('src/figs') / datetime.now().strftime("%Y-%m-%d") / time.strftime('%Hh%M')
+    target_path_figs = Path('figs') / datetime.now().strftime("%Y-%m-%d") / time.strftime('%Hh%M')
 
     # Plot beamforming errors
     pl.visualize_all_results(results_data_type_plots, plot_sett, cfg_original, False, False,

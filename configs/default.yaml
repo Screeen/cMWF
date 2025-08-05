@@ -1,13 +1,13 @@
 ## Description: Default configuration for the cyclic beamforming experiments.
 secondary_config_file: cmwf.yaml
 
-data_type: speech
+data_type: synthetic
 data_types_all: [synthetic, instruments, speech, no_gt]
 
 print_results: 1
 plot:
   destination:                  'debug'  # alternatives are debug, slides, paper
-  destination_final_results:    'debug'  # debug, slides, paper
+  destination_final_results:    'slides'  # debug, slides, paper
   intermediate_results:         0
   spectrograms:                 0
   all_variations:               0

@@ -618,34 +618,3 @@ class F0Manager:
         harmonic_freqs_est = harmonic_freqs_est[harmonic_freqs_est >= freq_range_cyclic[0]]
 
         return harmonic_freqs_est
-
-    @classmethod
-    def compute_harmonic_and_modulation_sets_global_coherence(cls, sig, harmonic_freqs_est, SFT, cfg_cyc) -> (hi.HarmonicInfo, F0ChangeAmount):
-        """ Compute harmonic and modulation sets based on the estimated harmonic frequencies using global coherence."""
-
-        # Input frequencies for global coherence: all pairwise difference and harmonic themselves
-        freqs_est_with_0 = np.concatenate((np.r_[0], harmonic_freqs_est))
-        freqs_list = cls.compute_pairwise_differences_between_freqs(freqs_est_with_0)
-
-        # Compute modulation vector and modulation matrix
-        max_len = sig['time'].shape[-1]
-        mod_coherence = Modulator(max_len, SFT.fs, freqs_list, fast_version=True,
-                                  max_rel_dist_alpha=1.e-3, use_filters=False,
-                                  max_freq_cyclic_hz=cfg_cyc['freq_range_cyclic'][1])
-
-        max_bin = int(np.ceil((3 * SFT.delta_f + np.max(np.abs(harmonic_freqs_est))) / SFT.delta_f))
-        rho = CoherenceManager.compute_coherence(sig, SFT, mod_coherence, max_bin, min_relative_power=1.e+3)
-        if 0:
-            cc0 = np.where(mod_coherence.alpha_vec_hz_ == 0)[0][0]
-            rho_no0 = np.delete(rho, cc0, axis=0)
-            alpha_no0 = np.delete(mod_coherence.alpha_vec_hz_, cc0, axis=0)
-            CoherenceManager.plot_coherence_matrix(rho_no0, alpha_no0, SFT)
-
-        # retain highly coherent modulated components only
-        harm_info = CoherenceManager.calculate_harmonic_info_from_coherence(mod_coherence.alpha_vec_hz_, rho,
-                                                                            thr=cfg_cyc['harmonic_threshold'],
-                                                                            P_max_cfg=cfg_cyc['P_max'],
-                                                                            nfft_real=SFT.mfft // 2 + 1)
-        mod_amount = F0ChangeAmount.small
-
-        return harm_info, mod_amount

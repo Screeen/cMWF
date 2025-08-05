@@ -1,5 +1,5 @@
 # Configuration file for the cyclic multichannel Wiener filter experiments.
-num_montecarlo_simulations: 1
+num_montecarlo_simulations: 3
 seed_is_random: true
 seed_if_not_random: 123
 max_num_varying_parameters: 199

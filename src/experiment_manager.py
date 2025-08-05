@@ -105,14 +105,9 @@ class ExperimentManager:
 
             mod_amount = F0ChangeAmount.no_change
             if is_cmwf_bf or is_first_chunk:
-                if cfg['cyclic']['use_global_coherence']:
-                    harm_info, mod_amount = f0man.compute_harmonic_and_modulation_sets_global_coherence(
-                        signals[cfg['cyclic']['coherence_source_signal_name']],
-                        harmonic_freqs_est, SFT, cfg['cyclic'])
-                else:
-                    harm_info, mod_amount = f0man.compute_harmonic_and_modulation_sets_distance_based(
-                        harmonic_freqs_est, cfg['harmonics_est'], cfg['cyclic'], dft_props, idx_chunk,
-                        f0_over_time[slice_bf], f0_tracker)
+                harm_info, mod_amount = f0man.compute_harmonic_and_modulation_sets_distance_based(
+                    harmonic_freqs_est, cfg['harmonics_est'], cfg['cyclic'], dft_props, idx_chunk,
+                    f0_over_time[slice_bf], f0_tracker)
 
                 if idx_chunk == 0:
                     print(f"Num shifts per set: {harm_info.num_shifts_per_set}")
@@ -143,32 +138,10 @@ class ExperimentManager:
                                                name_input_sig=name_input_sig)
             cov_dict_prev = dcopy(cov_dict)
 
-            # Rough SNR estimate
-            # noisy_noise = np.mean(np.trace(cov_dict['noisy_nb'], axis1=1, axis2=2).real)/np.mean(np.trace(cov_dict['noise_nb'], axis1=1, axis2=2).real)
-            # print(f"{noisy_noise = }")
-
-            harm_thr = coh_man.get_adaptive_harmonic_threshold(cfg['cyclic']['harmonic_threshold'], idx_chunk)
-            local_coherence_selection = (harm_thr > 0 and idx_chunk % 20 == 0
-                                         and not cfg['cyclic']['use_global_coherence'] and not is_cmwf_bf)
-            if local_coherence_selection:
-                ch_noisy_wb = cov_dict[name_input_sig + '_wb']
-                ch_noise_wb = cov_dict['noise_wb']
-                ch_noisy_wb, signals, harm_info = coh_man.remove_uncorrelated_modulations_local_coherence(
-                    cov_read=ch_noise_wb if 'noise' in cfg['cyclic']['coherence_source_signal_name'] else ch_noisy_wb,
-                    cov_write_list=[ch_noisy_wb],
-                    signals=signals, harm_info=harm_info, harmonic_threshold=harm_thr, group_by_set=False)
-
-                ce.harmonic_info = harm_info
-                bf.harmonic_info = harm_info
-                print(f"{idx_chunk = } {harm_info.num_shifts_per_set}")
-
             # Compute weights for beamformers
             weights, error_flags = bf.compute_weights_all_beamformers(cov_dict=cov_dict, rtf_oracle=target_rtf,
                                                                       idx_chunk=idx_chunk,
                                                                       name_input_sig=name_input_sig)
-            # weights = bf.use_old_weights_if_error(weights, weights_previous, error_flags)
-            # weights = bf.make_weights_dict_symmetric_around_central_frequency(K_nfft, weights)
-            # weights_previous = dcopy(weights)
 
             # Beamform the signals
             mod_amount_bf = mod_amount if idx_chunk != 0 else F0ChangeAmount.no_change
@@ -181,15 +154,8 @@ class ExperimentManager:
             for key in bfd.keys():
                 if key != name_input_sig:
                     bfd_all_chunks_stft[key][:, slice_bf] = bfd[key]
-                    # if use_masked_stft_for_evaluation:
-                    #     bfd_all_chunks_stft_masked[key][harm_info.mask_harmonic_bins, slice_bf] = bfd[key][
-                    #         harm_info.mask_harmonic_bins]
 
             # end of chunks loop
-
-        # if num_voiced_chunks > 0:
-        #     print(f"{num_voiced_chunks/num_chunks = }:.1f")
-        #     print(f"{np.mean(np.asarray(cyclic_bins_ratio_list)):.2f}")
 
         bf.check_beamformed_signals_non_zero(bfd_all_chunks_stft, signals)
 
@@ -214,40 +180,5 @@ class ExperimentManager:
                                      'stft': bfd_all_chunks_stft[key],
                                      # 'stft_masked': bfd_all_chunks_stft_masked[key],
                                      'display_name': pl.get_display_name(key)}
-
-        return signals_bfd_dict
-
-    @classmethod
-    def apply_post_filtering(cls, signals, signals_bfd_dict, dft_props, f0man, f0_over_time, harmonic_freqs_est,
-                             do_plots, SFT, SFT_real):
-        """ Apply post-filtering to the beamformed signals. """
-        cfg_copy = dcopy(cfg_original)
-
-        og_fields = ['noise_cov_est', 'wet_rank1']
-        for f in og_fields:  # these signals are not beamformed, so we need to add them to the dict
-            signals_bfd_dict[f] = signals[f]
-
-        # Broadcast the signals
-        for key in signals_bfd_dict.keys():
-            signals_bfd_dict[key]['time'] = np.atleast_2d(signals_bfd_dict[key]['time'])
-            if signals_bfd_dict[key]['stft'].ndim == 2:
-                signals_bfd_dict[key]['stft'] = signals_bfd_dict[key]['stft'][np.newaxis]
-                if 'stft_conj' in signals_bfd_dict[key].keys():
-                    signals_bfd_dict[key]['stft_conj'] = signals_bfd_dict[key]['stft_conj'][np.newaxis]
-
-        # Make signals mono
-        for f in og_fields:
-            for key in signals_bfd_dict[f].keys():
-                signals_bfd_dict[f][key] = signals_bfd_dict[f][key][0:1]
-        signals_bfd_dict['mvdr_blind']['stft_conj'] = np.conj(signals_bfd_dict['mvdr_blind']['stft'])
-
-        cfg_copy['M'] = 1
-        cfg_copy['beamforming']['methods'] = ['cmvdr_blind']
-        bfd_all_chunks_stft_2 = ExperimentManager.run_cov_estimation_beamforming(
-            signals_bfd_dict, f0man, f0_over_time, harmonic_freqs_est, cfg_copy, dft_props, do_plots, SFT,
-            name_input_sig='mvdr_blind')
-
-        bfd_all_chunks_stft_2_ = {'pf' + key: value for key, value in bfd_all_chunks_stft_2.items()}
-        signals_bfd_dict = ExperimentManager.convert_signals_time_domain(bfd_all_chunks_stft_2_, SFT_real)
 
         return signals_bfd_dict
