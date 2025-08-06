@@ -65,6 +65,26 @@ Run synthetic data experiments:
 - Instrument samples:  https://theremin.music.uiowa.edu/MIS.html.
 - Speech: Speech Intelligibility CD by Neil Thompson Shade
 
+## Troubleshooting
+
+If you get
+```
+ImportError: cannot import name 'kaiser' from 'scipy.signal' (.../.venv/lib/python3.X/site-packages/scipy/signal/__init__.py). Did you mean: 'kaiserord'?
+```
+Open the file
+```
+nano .../SVD-direct/env/lib/python3.X/site-packages/pysepm/util.py
+```
+and replace 
+```
+from scipy.signal import firls,kaiser,upfirdn
+```
+with
+```
+from scipy.signal import firls,upfirdn
+from scipy.signal.windows import kaiser
+```
+
 ---
 
 > [!NOTE]
