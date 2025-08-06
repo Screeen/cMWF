@@ -1,4 +1,4 @@
-# Cyclic multichannel Wiener filter (cMWF) for speech enhancement
+# Cyclic multichannel Wiener filter (cMWF) for acoustic beamforming
 
 ## Introduction
 This code accompanies the paper *"Cyclic multichannel Wiener filter for acoustic beamforming"*, 
