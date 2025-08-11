@@ -34,7 +34,7 @@ improves noise reduction in low-SNR scenarios.
 3. Install required packages:
 ```bash
    pip install --upgrade pip
-   uv add  # requires the `uv` package for managing virtual environments
+   uv sync  # requires the `uv` package for managing virtual environments
    # (or if you prefer:)
    # pip install -r requirements.txt
 ```
